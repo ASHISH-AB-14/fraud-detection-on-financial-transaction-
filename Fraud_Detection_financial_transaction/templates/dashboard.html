@@ -1,0 +1,80 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Fraud Alerts Dashboard</title>
+  <style>
+    body { font-family: Arial; padding: 20px; background: #f6f9fb; }
+    table { border-collapse: collapse; width: 100%; background: white; }
+    th, td { border: 1px solid #ddd; padding: 8px; }
+    th { background: #2f6fb2; color: white; }
+    tr:hover { background: #f1f1f1; }
+    .badge { background: #d9534f; color: white; padding: 4px 8px; border-radius: 4px; }
+    .controls { display:flex; gap:8px; }
+    form.inline { display:inline; }
+    #chart { margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <h1>Fraud Alerts Dashboard</h1>
+  <p>Total alerts: <strong>{{ total_alerts }}</strong> | Active (unacknowledged): <strong>{{ unack }}</strong></p>
+
+  {% if alerts and alerts|length > 0 %}
+    <div id="chart">
+      <h3>Top alert scores (bar)</h3>
+      <svg width="800" height="140">
+        {% set max_score = alerts[0].anomaly_score %}
+        {% for row in alerts[:10] %}
+          {% set idx = loop.index0 %}
+          {% set w = (row.anomaly_score / max_score) * 700 if max_score>0 else 0 %}
+          <rect x="80" y="{{ 10 + idx*12 }}" width="{{ w }}" height="10" style="fill:#2f6fb2;"></rect>
+          <text x="5" y="{{ 18 + idx*12 }}" font-size="10">{{ row.transaction_id }}</text>
+          <text x="{{ 90 + w }}" y="{{ 18 + idx*12 }}" font-size="10">{{ "%.3f"|format(row.anomaly_score) }}</text>
+        {% endfor %}
+      </svg>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          {% for k in alerts[0].keys() %}
+            <th>{{ k }}</th>
+          {% endfor %}
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in alerts %}
+        <tr>
+          <td>{{ loop.index }}</td>
+
+          {% for v in row.values() %}
+            <td>{{ v }}</td>
+          {% endfor %}
+
+          <td class="controls">
+            <form class="inline" method="post" action="/acknowledge">
+              <input type="hidden" name="transaction_id" value="{{ row.transaction_id }}">
+              <button type="submit">Acknowledge</button>
+            </form>
+
+            <form class="inline" method="post" action="/snooze">
+              <input type="hidden" name="transaction_id" value="{{ row.transaction_id }}">
+              <select name="minutes">
+                <option value="60">Snooze 1h</option>
+                <option value="360">Snooze 6h</option>
+                <option value="1440">Snooze 24h</option>
+              </select>
+              <button type="submit">Snooze</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No alerts found. Run <code>Fraud_Detection_Project.py</code> to generate <code>alerts.csv</code>.</p>
+  {% endif %}
+</body>
+</html>
